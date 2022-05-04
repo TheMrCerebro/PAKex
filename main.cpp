@@ -25,24 +25,27 @@
  * source distribution.
  *
 */
+
 #include <vector>
 #include <iostream>
-#include <fcntl.h>
+#include <fstream>
+#include <string>
+#include <direct.h>
 
 using namespace std;
 
 struct SPAKFileHeader
 {
     char tag[4];
-    int offset;
-    int length;
+    unsigned int offset;
+    unsigned int length;
 };
 
 struct SPAKFileEntry
 {
     char name[56];
-    int offset;
-    int length;
+    unsigned int offset;
+    unsigned int length;
 };
 
 int main()
@@ -65,34 +68,49 @@ int main()
     cout << " File: ";
 
     string path;
-    cin >> path;
+    getline(cin,path);
 
     cout << endl;
 
     // Crea la carpeta principal con el nombre del archivo ".pak" donde se va a extraer el contenido.
     std::string folder;
-    for(size_t i=0; i<path.find(".");++i)
-        folder += path[i];
+    const char* s = path.c_str();
+    const char* p = s + path.size();
 
-    mkdir(folder.c_str());
-    chdir(folder.c_str());
+    while( *p != '/' && *p != '\\' && p != s )
+        p--;
+
+    if( p != s )
+    {
+        ++p;
+        folder = p;
+    }
+
+    // Elimina la extension del nombre
+	size_t endPos = folder.find(".");
+	folder = folder.substr( 0, endPos < 0 ? folder.size () : endPos );
+
+    _mkdir(folder.c_str());
+    _chdir(folder.c_str());
 
     // Hubicacion de la carpeta principal.
     char cwd[256];
-    getcwd(cwd, 256);
+    _getcwd(cwd, 256);
 
 	SPAKFileHeader header;
 
-	FILE *pf = fopen(path.c_str(),"rb");
-	fread(&header, 1, sizeof(header), pf);
+    ifstream pf(path.c_str(), ios::binary);
+    pf.read(reinterpret_cast<char*>(&header), sizeof(header));
 
     char* tag = header.tag;
 	if(tag[0] == 'P' && tag[1] == 'A' && tag[2] == 'C' && tag[3] == 'K')
     {
         cout << " Valid PAK file" << endl;
         cout << endl;
+        cout << " Extracting..." << endl;
+        cout << endl;
 
-        fseek(pf, header.offset, SEEK_SET);
+        pf.seekg(header.offset, ios::beg);
 
         const int numberOfFiles = header.length / sizeof(SPAKFileEntry);
 
@@ -101,7 +119,7 @@ int main()
         {
             // read an entry
             SPAKFileEntry entry;
-            fread(&entry, 1, sizeof(entry), pf);
+            pf.read(reinterpret_cast<char*>(&entry), sizeof(entry));
             entryA.push_back(entry);
         }
 
@@ -113,8 +131,8 @@ int main()
                 if(entryA[i].name[j]=='/')
                 {
                     if((int)tmp.find(".") > -1) break;
-                    mkdir(tmp.c_str());
-                    chdir(tmp.c_str());
+                    _mkdir(tmp.c_str());
+                    _chdir(tmp.c_str());
                     tmp.clear();
                 }
                 else
@@ -123,26 +141,26 @@ int main()
                 }
             }
 
-            chdir(cwd);
+            _chdir(cwd);
 
             char *buffer = new char[entryA[i].length];
 
-            fseek(pf, entryA[i].offset, SEEK_SET);
-            fread(buffer, 1, entryA[i].length, pf);
+            pf.seekg(entryA[i].offset, ios::beg);
+            pf.read(buffer, entryA[i].length);
 
-            FILE *wf = fopen(entryA[i].name,"wb");
-            fwrite(buffer, 1, entryA[i].length, wf);
-            fclose(wf);
+            ofstream wf(entryA[i].name, ios::binary);
+            wf.write(buffer, entryA[i].length);
+            wf.close();
 
             delete [] buffer;
 
-            cout << "  " << entryA[i].name << endl;
+            cout << "  " << folder << "/" << entryA[i].name << endl;
         }
 
         cout << endl;
-        cout << " Total Files: " << numberOfFiles << endl;
-        cout << endl;
         cout << " ...Finished" << endl;
+        cout << endl;
+        cout << " Total Files: " << numberOfFiles << endl;
         cout << endl;
     }
     else
@@ -151,7 +169,7 @@ int main()
         cout << endl;
     }
 
-    fclose(pf);
+    pf.close();
 
     system("pause");
     return 0;
