@@ -28,7 +28,6 @@
 
 #include <vector>
 #include <iostream>
-#include <fstream>
 #include <string>
 #include <direct.h>
 
@@ -73,7 +72,7 @@ int main()
     cout << endl;
 
     // Crea la carpeta principal con el nombre del archivo ".pak" donde se va a extraer el contenido.
-    std::string folder;
+    string folder;
     const char* s = path.c_str();
     const char* p = s + path.size();
 
@@ -99,8 +98,8 @@ int main()
 
 	SPAKFileHeader header;
 
-    ifstream pf(path.c_str(), ios::binary);
-    pf.read(reinterpret_cast<char*>(&header), sizeof(header));
+    FILE* pf = fopen(path.c_str(), "rb");
+    fread(&header, 1, sizeof(header), pf);
 
     char* tag = header.tag;
 	if(tag[0] == 'P' && tag[1] == 'A' && tag[2] == 'C' && tag[3] == 'K')
@@ -110,7 +109,7 @@ int main()
         cout << " Extracting..." << endl;
         cout << endl;
 
-        pf.seekg(header.offset, ios::beg);
+        fseek(pf, header.offset, SEEK_SET);
 
         const int numberOfFiles = header.length / sizeof(SPAKFileEntry);
 
@@ -119,7 +118,7 @@ int main()
         {
             // read an entry
             SPAKFileEntry entry;
-            pf.read(reinterpret_cast<char*>(&entry), sizeof(entry));
+            fread(&entry, 1, sizeof(entry), pf);
             entryA.push_back(entry);
         }
 
@@ -145,12 +144,12 @@ int main()
 
             char *buffer = new char[entryA[i].length];
 
-            pf.seekg(entryA[i].offset, ios::beg);
-            pf.read(buffer, entryA[i].length);
+            fseek(pf, entryA[i].offset, SEEK_SET);
+            fread(buffer, 1, entryA[i].length, pf);
 
-            ofstream wf(entryA[i].name, ios::binary);
-            wf.write(buffer, entryA[i].length);
-            wf.close();
+            FILE* wf = fopen(entryA[i].name, "wb");
+            fwrite(buffer, 1, entryA[i].length, wf);
+            fclose(wf);
 
             delete [] buffer;
 
@@ -169,7 +168,7 @@ int main()
         cout << endl;
     }
 
-    pf.close();
+    fclose(pf);
 
     system("pause");
     return 0;
